@@ -1,13 +1,13 @@
 package steam
 
 import (
-	// "sort"
-	"strconv"
-	// "strings"
 	"encoding/xml"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sort"
+	"strconv"
+	"strings"
 )
 
 var (
@@ -115,36 +115,6 @@ func (s GamesByLast2Weeks) Swap(i, j int) { s.Games[i], s.Games[j] = s.Games[j],
 func (s GamesByHours) Len() int      { return len(s.Games) }
 func (s GamesByHours) Swap(i, j int) { s.Games[i], s.Games[j] = s.Games[j], s.Games[i] }
 
-// func Update(user string) {
-// 	steamUserUpdate(user)
-// 	steamGamesUpdate(user)
-
-// 	UserData.Summary = strings.Replace(UserData.Summary, "<br>", "", -1)
-// 	UserData.GameCount = len(GamesData.Games)
-
-// 	playedLast2Weeks := []Game{}
-// 	notPlayedLastWeeks := []Game{}
-
-// 	for i := range GamesData.Games {
-// 		game := GamesData.Games[i]
-
-// 		if game.HoursLast2Weeks != "" {
-// 			playedLast2Weeks = append(playedLast2Weeks, game)
-// 		} else {
-// 			notPlayedLastWeeks = append(notPlayedLastWeeks, game)
-// 		}
-// 	}
-
-// 	sort.Sort(GamesByLast2Weeks{Games: playedLast2Weeks})
-// 	sort.Sort(GamesByHours{Games: notPlayedLastWeeks})
-
-// 	sortedGames := append(playedLast2Weeks, notPlayedLastWeeks...)
-
-// 	GamesData.Games = sortedGames[:5]
-
-// 	fmt.Println(" updated", time.Now())
-// }
-
 func SetConfig(u string) {
 	user = u
 }
@@ -153,18 +123,48 @@ func GetUser() *User {
 	uri := steamApiRoot + user + "?xml=1"
 	userdata := &User{}
 	getData(uri, userdata)
+
+	userdata.Summary = strings.Replace(userdata.Summary, "<br>", "", -1)
+	userdata.GameCount = len(*getGames())
+
 	return userdata
 }
 
-func GetGames(limit int) *[]Game {
-	uri := steamApiRoot + user + "/games/?xml=1"
-	gamedata := &GamesList{}
-	getData(uri, gamedata)
-	games := gamedata.Games[:limit]
-	return &games
+func GetRecentGames(limit int) *[]Game {
+	games := sortGames(*getGames())
+	return games
 }
 
 // PRIVATE
+
+func getGames() *[]Game {
+	uri := steamApiRoot + user + "/games/?xml=1"
+	gamedata := &GamesList{}
+	getData(uri, gamedata)
+	return &gamedata.Games
+}
+
+func sortGames(games []Game) *[]Game {
+	playedLast2Weeks := []Game{}
+	notPlayedLastWeeks := []Game{}
+
+	for i := range games {
+		game := games[i]
+
+		if game.HoursLast2Weeks != "" {
+			playedLast2Weeks = append(playedLast2Weeks, game)
+		} else {
+			notPlayedLastWeeks = append(notPlayedLastWeeks, game)
+		}
+	}
+
+	sort.Sort(GamesByLast2Weeks{Games: playedLast2Weeks})
+	sort.Sort(GamesByHours{Games: notPlayedLastWeeks})
+
+	sortedGames := append(playedLast2Weeks, notPlayedLastWeeks...)
+	sortedGames = sortedGames[:5]
+	return &sortedGames
+}
 
 func getData(uri string, i interface{}) {
 	data := getRequest(uri)
