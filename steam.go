@@ -131,7 +131,7 @@ func GetUser() *User {
 }
 
 func GetRecentGames(limit int) *[]Game {
-	games := sortGames(*getGames())
+	games := sortGames(*getGames(), limit)
 	return games
 }
 
@@ -144,7 +144,7 @@ func getGames() *[]Game {
 	return &gamedata.Games
 }
 
-func sortGames(games []Game) *[]Game {
+func sortGames(games []Game, limit int) *[]Game {
 	playedLast2Weeks := []Game{}
 	notPlayedLastWeeks := []Game{}
 
@@ -162,7 +162,7 @@ func sortGames(games []Game) *[]Game {
 	sort.Sort(GamesByHours{Games: notPlayedLastWeeks})
 
 	sortedGames := append(playedLast2Weeks, notPlayedLastWeeks...)
-	sortedGames = sortedGames[:5]
+	sortedGames = sortedGames[:limit]
 	return &sortedGames
 }
 
