@@ -11,9 +11,10 @@ import (
 )
 
 var (
-	user string
+	user  string
+	limit int
 
-	steamApiRoot = "http://steamcommunity.com/id/"
+	apiRoot = "http://steamcommunity.com/id/"
 )
 
 type User struct {
@@ -36,7 +37,7 @@ type User struct {
 }
 
 func (u User) FullURL() string {
-	return steamApiRoot + u.CustomURL
+	return apiRoot + u.CustomURL
 }
 
 func (u User) RatingDescription() string {
@@ -82,6 +83,40 @@ type GamesList struct {
 	Games []Game `xml:"games>game"`
 }
 
+func (g GamesList) RecentlyPlayed() *GamesList {
+	playedLast2Weeks := []Game{}
+	notPlayedLastWeeks := []Game{}
+	games := g.Games
+
+	for i := range games {
+		game := games[i]
+
+		if game.HoursLast2Weeks != "" {
+			playedLast2Weeks = append(playedLast2Weeks, game)
+		} else {
+			notPlayedLastWeeks = append(notPlayedLastWeeks, game)
+		}
+	}
+
+	sort.Sort(GamesByLast2Weeks{Games: playedLast2Weeks})
+	sort.Sort(GamesByHours{Games: notPlayedLastWeeks})
+
+	sortedGames := append(playedLast2Weeks, notPlayedLastWeeks...)
+	g.Games = sortedGames[:limit]
+	return &g
+}
+
+func (g GamesList) HoursPlayed2Wk() float64 {
+	hours := 0.0
+	for i := range g.Games {
+		game := g.Games[i]
+		hrs, _ := strconv.ParseFloat(game.HoursLast2Weeks, 64)
+		hours += hrs
+	}
+
+	return hours
+}
+
 type Game struct {
 	AppID           string `xml:"appID"`
 	Name            string `xml:"name"`
@@ -115,56 +150,30 @@ func (s GamesByLast2Weeks) Swap(i, j int) { s.Games[i], s.Games[j] = s.Games[j],
 func (s GamesByHours) Len() int      { return len(s.Games) }
 func (s GamesByHours) Swap(i, j int) { s.Games[i], s.Games[j] = s.Games[j], s.Games[i] }
 
-func SetConfig(u string) {
+func SetConfig(u string, l int) {
 	user = u
+	limit = l
 }
 
 func GetUser() *User {
-	uri := steamApiRoot + user + "?xml=1"
+	uri := apiRoot + user + "?xml=1"
 	userdata := &User{}
 	getData(uri, userdata)
 
 	userdata.Summary = strings.Replace(userdata.Summary, "<br>", "", -1)
-	userdata.GameCount = len(*getGames())
+	userdata.GameCount = len(GetGames().Games)
 
 	return userdata
 }
 
-func GetRecentGames(limit int) *[]Game {
-	games := sortGames(*getGames(), limit)
-	return games
+func GetGames() *GamesList {
+	uri := apiRoot + user + "/games/?xml=1"
+	gamedata := &GamesList{}
+	getData(uri, gamedata)
+	return gamedata
 }
 
 // PRIVATE
-
-func getGames() *[]Game {
-	uri := steamApiRoot + user + "/games/?xml=1"
-	gamedata := &GamesList{}
-	getData(uri, gamedata)
-	return &gamedata.Games
-}
-
-func sortGames(games []Game, limit int) *[]Game {
-	playedLast2Weeks := []Game{}
-	notPlayedLastWeeks := []Game{}
-
-	for i := range games {
-		game := games[i]
-
-		if game.HoursLast2Weeks != "" {
-			playedLast2Weeks = append(playedLast2Weeks, game)
-		} else {
-			notPlayedLastWeeks = append(notPlayedLastWeeks, game)
-		}
-	}
-
-	sort.Sort(GamesByLast2Weeks{Games: playedLast2Weeks})
-	sort.Sort(GamesByHours{Games: notPlayedLastWeeks})
-
-	sortedGames := append(playedLast2Weeks, notPlayedLastWeeks...)
-	sortedGames = sortedGames[:limit]
-	return &sortedGames
-}
 
 func getData(uri string, i interface{}) {
 	data := getRequest(uri)
