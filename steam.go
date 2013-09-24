@@ -102,7 +102,13 @@ func (g GamesList) RecentlyPlayed() *GamesList {
 	sort.Sort(GamesByHours{Games: notPlayedLastWeeks})
 
 	sortedGames := append(playedLast2Weeks, notPlayedLastWeeks...)
-	g.Games = sortedGames[:limit]
+
+	if len(g.Games) > limit && limit > 0 {
+		g.Games = sortedGames[:limit]
+	} else {
+		g.Games = sortedGames
+	}
+
 	return &g
 }
 
